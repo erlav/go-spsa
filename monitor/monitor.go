@@ -7,6 +7,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
+	"google.golang.org/protobuf/internal/errors"
 )
 
 type PushMonitor struct {
@@ -30,19 +31,27 @@ func getRawURL() (string, error) {
 				port = addr.Port()
 			}
 			host = addr.Host
+		} else {
+			return "", err
 		}
+	} else {
+		return "", errors.Error("No existe la variable PG_PORT")
 	}
 	return fmt.Sprintf("%s://%s:%s", scheme, host, port), nil
 }
 
 func New(job string, keys_label []string, data map[string]string) (*PushMonitor, error) {
-	rawurl, _ := getRawURL()
-	var pm PushMonitor = PushMonitor{push.New(rawurl, job), keys_label, data}
-	pm.Pusher.Grouping("tipointegracion", "api")
-	for k, v := range data {
-		pm.Pusher.Grouping(k, v)
+	if rawurl, err := getRawURL(); err != nil {
+		return nil, err
+	} else {
+		var pm PushMonitor = PushMonitor{push.New(rawurl, job), keys_label, data}
+		pm.Pusher.Grouping("tipointegracion", "api")
+		for k, v := range data {
+			pm.Pusher.Grouping(k, v)
+		}
+		return &pm, nil
 	}
-	return &pm, nil
+
 }
 
 func (pm *PushMonitor) PushMetric(name string, value float64, labels map[string]string) error {
